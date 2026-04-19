@@ -1,0 +1,8 @@
+# Build output
+/tanrenai-gpu
+*.exe
+# Editor
+.idea/
+.vscode/
+# OS
+.DS_Store
