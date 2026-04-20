@@ -187,26 +187,24 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 		slog.Info("auto-detected context length from GGUF", "ctx_size", opts.CtxSize)
 	}
 
-	// Auto-enable `--cpu-moe` when we detect an MoE model and the
-	// caller hasn't specified offload preferences. This puts expert
-	// weights on CPU (only a few experts are active per token) while
-	// attention, routers, and active experts stay on GPU — uses a
-	// fraction of the VRAM the full model would need while keeping
-	// inference GPU-accelerated where it matters. Safer default across
-	// the varying VRAM capacities you get from Vast.ai hosts.
+	// Log MoE architecture when detected. We don't auto-enable any
+	// special offload flags here — the default path (`--n-gpu-layers
+	// 999`) works fine on cards large enough to hold the model (for
+	// a 65 GB Q4 on an 80 GB A100, there's plenty of headroom).
 	//
-	// Previously auto-enabled `--fit on` here, but llama.cpp's fit
-	// heuristic counts total MoE params (e.g. 122B) rather than
-	// active (10B), over-estimates memory, and refuses to offload any
-	// layers — ends up running the whole model on CPU.
+	// Two earlier attempts were both wrong:
+	//   - `--fit on`: llama.cpp's heuristic counts total MoE params
+	//     (122B) instead of active (10B), decides it won't fit, and
+	//     offloads zero layers — model ends up on CPU.
+	//   - `--cpu-moe`: in this llama.cpp version it also pushes the
+	//     KV cache to CPU, killing inference speed.
+	//
+	// Users who genuinely don't have enough VRAM can opt in via
+	// `cpu_moe` or `gpu_layers` per request.
 	if meta != nil && meta.Architecture.ExpertCount > 0 {
 		slog.Info("MoE model detected",
 			"experts", meta.Architecture.ExpertCount,
 			"active", meta.Architecture.ExpertUsedCount)
-		if !opts.CPUMoE && opts.CPUMoELayers == 0 && opts.GPULayers == runner.DefaultOptions().GPULayers {
-			opts.CPUMoE = true
-			slog.Info("auto-enabled --cpu-moe for MoE model")
-		}
 	}
 
 	// Auto-detect chat template from GGUF metadata when no explicit template is set.
