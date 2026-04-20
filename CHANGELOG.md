@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.0.0...v1.0.1) (2026-04-20)
+
+### Bug Fixes
+
+* **server:** drop auto-FitVRAM for MoE models ([cc5d736](https://github.com/ThatCatDev/tanrenai-gpu/commit/cc5d73610979009e04f81dbdf8deca37305266b4))
+
 ## 1.0.0 (2026-04-19)
 
 ### Features
