@@ -187,14 +187,25 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 		slog.Info("auto-detected context length from GGUF", "ctx_size", opts.CtxSize)
 	}
 
-	// Auto-detect MoE architecture and enable fit mode if not explicitly configured.
+	// Auto-enable `--cpu-moe` when we detect an MoE model and the
+	// caller hasn't specified offload preferences. This puts expert
+	// weights on CPU (only a few experts are active per token) while
+	// attention, routers, and active experts stay on GPU — uses a
+	// fraction of the VRAM the full model would need while keeping
+	// inference GPU-accelerated where it matters. Safer default across
+	// the varying VRAM capacities you get from Vast.ai hosts.
+	//
+	// Previously auto-enabled `--fit on` here, but llama.cpp's fit
+	// heuristic counts total MoE params (e.g. 122B) rather than
+	// active (10B), over-estimates memory, and refuses to offload any
+	// layers — ends up running the whole model on CPU.
 	if meta != nil && meta.Architecture.ExpertCount > 0 {
 		slog.Info("MoE model detected",
 			"experts", meta.Architecture.ExpertCount,
 			"active", meta.Architecture.ExpertUsedCount)
-		if !opts.FitVRAM && opts.GPULayers == runner.DefaultOptions().GPULayers {
-			opts.FitVRAM = true
-			slog.Info("auto-enabled --fit for MoE model")
+		if !opts.CPUMoE && opts.CPUMoELayers == 0 && opts.GPULayers == runner.DefaultOptions().GPULayers {
+			opts.CPUMoE = true
+			slog.Info("auto-enabled --cpu-moe for MoE model")
 		}
 	}
 
