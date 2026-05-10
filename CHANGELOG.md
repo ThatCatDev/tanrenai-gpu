@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.1.1...v1.1.2) (2026-05-10)
+
+### Bug Fixes
+
+* **docker:** build llama-server with portable CPU baseline ([#5](https://github.com/ThatCatDev/tanrenai-gpu/issues/5)) ([0345a23](https://github.com/ThatCatDev/tanrenai-gpu/commit/0345a23a787c6d920d0404501a279f5e5b5f7636))
+
 ## [1.1.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.1.0...v1.1.1) (2026-05-10)
 
 ### Bug Fixes
