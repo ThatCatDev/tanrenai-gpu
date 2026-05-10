@@ -116,9 +116,10 @@ func ModelsDir() string {
 // DownloadProgress is called periodically during a model download.
 type DownloadProgress = models.DownloadProgress
 
-// DownloadModel downloads a GGUF model from a URL to the models directory.
+// DownloadModel downloads a GGUF model from a URL to the models directory,
+// saving it under the source URL's filename.
 func DownloadModel(url, destDir string, progress DownloadProgress) (string, error) {
-	return models.Download(url, destDir, progress)
+	return models.Download(url, destDir, "", progress)
 }
 
 // ResolveModel resolves a model name to its file path in the models directory.
