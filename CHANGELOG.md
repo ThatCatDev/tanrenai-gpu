@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.0.2...v1.1.0) (2026-05-10)
+
+### Features
+
+* **pull:** accept name field on /api/pull to override saved filename ([#3](https://github.com/ThatCatDev/tanrenai-gpu/issues/3)) ([de6dd37](https://github.com/ThatCatDev/tanrenai-gpu/commit/de6dd3705dfb56016aa8fe58fcd9ca31d5f27dc6))
+
 ## [1.0.2](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.0.1...v1.0.2) (2026-04-20)
 
 ### Bug Fixes
