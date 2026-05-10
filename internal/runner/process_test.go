@@ -206,6 +206,30 @@ func TestBuildArgs_NoOptionalFlags(t *testing.T) {
 	}
 }
 
+func TestBuildArgs_FitOffByDefault(t *testing.T) {
+	r := &ProcessRunner{
+		modelPath: "/models/mymodel.gguf",
+		opts: Options{
+			CtxSize:   4096,
+			GPULayers: -1,
+			// FitVRAM left at zero value (false)
+		},
+	}
+	mustContainPair(t, r.buildArgs(), "--fit", "off")
+}
+
+func TestBuildArgs_FitOnWhenEnabled(t *testing.T) {
+	r := &ProcessRunner{
+		modelPath: "/models/mymodel.gguf",
+		opts: Options{
+			CtxSize:   4096,
+			GPULayers: -1,
+			FitVRAM:   true,
+		},
+	}
+	mustContainPair(t, r.buildArgs(), "--fit", "on")
+}
+
 // ---- ModelName from Load (without subprocess) ----
 
 func TestProcessRunner_ModelName_SplitGGUF(t *testing.T) {

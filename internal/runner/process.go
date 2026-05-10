@@ -135,8 +135,18 @@ func (r *ProcessRunner) buildArgs() []string {
 		args = append(args, "--no-kv-offload")
 	}
 
+	// Always pass --fit explicitly. llama.cpp's recent builds run the
+	// device-memory introspection step even without --fit on, and the
+	// introspection itself has segfaulted on at least one Ampere host
+	// (RTX A6000) in master b1-1e5ad35 — crashing inside
+	// common_params_fit_impl before the model finished loading. Sizing
+	// is already enforced upstream (the platform picks an offer with
+	// enough VRAM for the chosen model); we don't need llama.cpp to
+	// re-derive it. Forcing --fit off skips the buggy code path.
 	if r.opts.FitVRAM {
 		args = append(args, "--fit", "on")
+	} else {
+		args = append(args, "--fit", "off")
 	}
 
 	if r.opts.TensorSplit != "" {
