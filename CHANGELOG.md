@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.1.0...v1.1.1) (2026-05-10)
+
+### Bug Fixes
+
+* **runner:** pass --fit off explicitly when FitVRAM is disabled ([#4](https://github.com/ThatCatDev/tanrenai-gpu/issues/4)) ([bd65fce](https://github.com/ThatCatDev/tanrenai-gpu/commit/bd65fce609b4854e9564ee1bd4a6e227534c9762))
+
 ## [1.1.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.0.2...v1.1.0) (2026-05-10)
 
 ### Features
