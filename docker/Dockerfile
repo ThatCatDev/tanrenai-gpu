@@ -21,9 +21,22 @@ RUN apt-get update -qq && \
 RUN git clone --depth 1 --branch "$LLAMA_CPP_REF" https://github.com/ggml-org/llama.cpp /opt/llama.cpp
 
 WORKDIR /opt/llama.cpp
+# GGML_NATIVE defaults to ON and bakes whatever CPU instructions the
+# build host advertises into the binary (AVX-512, AVX-VNNI, etc.). For
+# a portable cloud image that's the wrong default: vast.ai routinely
+# allocates older Xeons/EPYCs (e.g. E5-2650 v4 — AVX2 only, no
+# AVX-512), and an AVX-512 instruction baked in from a newer build
+# host triggers SIGILL on `load_tensors`. Pin a conservative baseline
+# that any x86-64-v3 host supports (Haswell 2013+) and let llama.cpp's
+# runtime dispatch pick up extras when available.
 RUN cmake -B build \
       -DGGML_CUDA=ON \
       -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHITECTURES" \
+      -DGGML_NATIVE=OFF \
+      -DGGML_AVX=ON \
+      -DGGML_AVX2=ON \
+      -DGGML_FMA=ON \
+      -DGGML_F16C=ON \
       -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release -j"$(nproc)" -t llama-server
 
