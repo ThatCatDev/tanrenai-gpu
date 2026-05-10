@@ -25,7 +25,7 @@ func init() {
 }
 
 func TestDownload_NonGGUFURL(t *testing.T) {
-	_, err := Download("http://example.com/model.bin", t.TempDir(), nil)
+	_, err := Download("http://example.com/model.bin", t.TempDir(), "", nil)
 	if err == nil {
 		t.Fatal("expected error for non-.gguf URL")
 	}
@@ -49,7 +49,7 @@ func TestDownload_HappyPath(t *testing.T) {
 		lastTotal = total
 	}
 
-	path, err := Download(url, destDir, progress)
+	path, err := Download(url, destDir, "", progress)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestDownload_NilProgress(t *testing.T) {
 	url := srv.URL + "/model.gguf"
 
 	// progress=nil should not panic
-	path, err := Download(url, destDir, nil)
+	path, err := Download(url, destDir, "", nil)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestDownload_ServerError(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	_, err := Download(srv.URL+"/model.gguf", destDir, nil)
+	_, err := Download(srv.URL+"/model.gguf", destDir, "", nil)
 	if err == nil {
 		t.Fatal("expected error for server 500")
 	}
@@ -144,7 +144,7 @@ func TestDownload_PartialResume(t *testing.T) {
 		t.Fatalf("setup partial file: %v", err)
 	}
 
-	path, err := Download(url, destDir, nil)
+	path, err := Download(url, destDir, "", nil)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestDownload_PresignedURLWithQuery(t *testing.T) {
 	// Mirror what modelcache.Cache.Lookup returns.
 	url := srv.URL + "/models/unsloth/Qwen-GGUF/Q4_K_M/Qwen-Q4_K_M-00001-of-00003.gguf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=deadbeef"
 
-	path, err := Download(url, destDir, nil)
+	path, err := Download(url, destDir, "", nil)
 	if err != nil {
 		t.Fatalf("Download error on presigned URL: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestDownload_NetworkError(t *testing.T) {
 	// .invalid is reserved by RFC 2606 — DNS fails fast, no slow connect
 	// attempt on any real port. We want a connect-level failure that
 	// doesn't take 30s in WSL.
-	_, err := Download("http://no-such-host.invalid/model.gguf", t.TempDir(), nil)
+	_, err := Download("http://no-such-host.invalid/model.gguf", t.TempDir(), "", nil)
 	if err == nil {
 		t.Fatal("expected network error")
 	}
@@ -213,7 +213,7 @@ func TestDownload_HFProvenance(t *testing.T) {
 	// We can't fully test HF provenance without a real HF URL, but we can test
 	// that a non-HF URL doesn't error.
 	url := srv.URL + "/model.gguf"
-	path, err := Download(url, destDir, nil)
+	path, err := Download(url, destDir, "", nil)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestDownload_StalledConnection(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	_, err := Download(srv.URL+"/stall.gguf", destDir, nil)
+	_, err := Download(srv.URL+"/stall.gguf", destDir, "", nil)
 	if err == nil {
 		t.Fatal("expected stall error; got success")
 	}
@@ -281,7 +281,7 @@ func TestDownload_RetriesAndResumes(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	path, err := Download(srv.URL+"/retry.gguf", destDir, nil)
+	path, err := Download(srv.URL+"/retry.gguf", destDir, "", nil)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestDownload_TruncatedStreamIsRetryable(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	_, err := Download(srv.URL+"/trunc.gguf", destDir, nil)
+	_, err := Download(srv.URL+"/trunc.gguf", destDir, "", nil)
 	if err == nil {
 		t.Fatal("expected truncation error; got success")
 	}
@@ -347,7 +347,7 @@ func TestDownload_LargeContent_ProgressTracking(t *testing.T) {
 		callCount++
 	}
 
-	path, err := Download(url, destDir, progress)
+	path, err := Download(url, destDir, "", progress)
 	if err != nil {
 		t.Fatalf("Download error: %v", err)
 	}
@@ -361,5 +361,78 @@ func TestDownload_LargeContent_ProgressTracking(t *testing.T) {
 	}
 	if callCount == 0 {
 		t.Error("progress callback never called")
+	}
+}
+
+// TestDownload_SaveAs_SingleShard verifies the saveAs override renames the
+// file to <saveAs>.gguf when the source URL is a single-file model.
+func TestDownload_SaveAs_SingleShard(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake gguf"))
+	}))
+	defer srv.Close()
+
+	destDir := t.TempDir()
+	url := srv.URL + "/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+
+	path, err := Download(url, destDir, "Qwen3.6-35B-A3B-Q4_K_M", nil)
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	want := filepath.Join(destDir, "Qwen3.6-35B-A3B-Q4_K_M.gguf")
+	if path != want {
+		t.Errorf("path = %q, want %q", path, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("expected file at %s: %v", want, err)
+	}
+}
+
+// TestDownload_SaveAs_PreservesShardSuffix verifies that for sharded
+// downloads the `-NNNNN-of-MMMMM.gguf` suffix is preserved across the
+// rename so each shard lands in its own file under the new prefix.
+func TestDownload_SaveAs_PreservesShardSuffix(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake shard"))
+	}))
+	defer srv.Close()
+
+	destDir := t.TempDir()
+	url := srv.URL + "/Qwen3.5-122B-A10B-UD-Q4_K_XL-00002-of-00003.gguf"
+
+	path, err := Download(url, destDir, "Qwen3.5-122B-A10B-Q4_K_XL", nil)
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	want := filepath.Join(destDir, "Qwen3.5-122B-A10B-Q4_K_XL-00002-of-00003.gguf")
+	if path != want {
+		t.Errorf("path = %q, want %q", path, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("expected file at %s: %v", want, err)
+	}
+}
+
+// TestDownload_EmptySaveAs_KeepsSourceFilename ensures the empty-string
+// override leaves behavior identical to the pre-saveAs API.
+func TestDownload_EmptySaveAs_KeepsSourceFilename(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake gguf"))
+	}))
+	defer srv.Close()
+
+	destDir := t.TempDir()
+	url := srv.URL + "/some-model.gguf"
+
+	path, err := Download(url, destDir, "", nil)
+	if err != nil {
+		t.Fatalf("Download: %v", err)
+	}
+	want := filepath.Join(destDir, "some-model.gguf")
+	if path != want {
+		t.Errorf("path = %q, want %q", path, want)
 	}
 }

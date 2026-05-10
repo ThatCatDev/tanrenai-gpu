@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -49,13 +50,25 @@ func isRetryable(err error) bool {
 	return !errors.As(err, &p)
 }
 
+// shardSuffix matches the trailing `-NNNNN-of-MMMMM.gguf` segment used in
+// HF's split-GGUF naming convention. We preserve it when overriding the
+// destination basename so a sharded model still ends up with one file per
+// shard, just under the caller-supplied prefix.
+var shardSuffix = regexp.MustCompile(`-\d{5}-of-\d{5}\.gguf$`)
+
 // Download downloads a GGUF file from HuggingFace (or any direct URL
 // including presigned S3/R2 URLs). Retries up to DownloadMaxAttempts on
 // transient errors — connection drops, TCP stalls, truncated streams —
 // resuming from the existing .partial file via Range on each retry.
 //
 //	https://huggingface.co/<repo>/resolve/main/<filename>.gguf
-func Download(url, destDir string, progress DownloadProgress) (string, error) {
+//
+// `saveAs` is the destination basename (without `.gguf`); when empty, the
+// source URL's filename is used. When set, it overrides the basename but
+// any shard suffix (`-NNNNN-of-MMMMM.gguf`) from the source URL is preserved
+// so multi-shard models still distribute across multiple files. The caller
+// is responsible for passing the same `saveAs` for every shard of one model.
+func Download(url, destDir, saveAs string, progress DownloadProgress) (string, error) {
 	parsed, err := neturl.Parse(url)
 	if err != nil {
 		return "", fmt.Errorf("parse URL: %w", err)
@@ -63,6 +76,13 @@ func Download(url, destDir string, progress DownloadProgress) (string, error) {
 	filename := path.Base(parsed.Path)
 	if !strings.HasSuffix(strings.ToLower(filename), ".gguf") {
 		return "", fmt.Errorf("URL does not point to a .gguf file: %s", filename)
+	}
+	if saveAs != "" {
+		if shard := shardSuffix.FindString(filename); shard != "" {
+			filename = saveAs + shard
+		} else {
+			filename = saveAs + ".gguf"
+		}
 	}
 
 	destPath := filepath.Join(destDir, filename)

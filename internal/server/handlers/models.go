@@ -93,8 +93,14 @@ type PullHandler struct {
 func (h *PullHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 
+	// `name` is optional. When set, the downloaded file is saved as
+	// `<name>.gguf` (or `<name>-NNNNN-of-MMMMM.gguf` for sharded models),
+	// regardless of the source URL's filename. Lets callers control the
+	// on-disk identity that /v1/models and /api/load see, so a user-typed
+	// model name flows through cache + pull + load unchanged.
 	var req struct {
-		URL string `json:"url"`
+		URL  string `json:"url"`
+		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "failed to parse request body")
@@ -158,7 +164,7 @@ func (h *PullHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		path, err := models.Download(dlURL, h.Store.Dir(), progress)
+		path, err := models.Download(dlURL, h.Store.Dir(), req.Name, progress)
 		if err != nil {
 			sendEvent(map[string]string{"status": "error", "error": err.Error()})
 

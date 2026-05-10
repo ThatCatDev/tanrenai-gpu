@@ -122,6 +122,45 @@ func TestPullHandler_DirectURLDownload(t *testing.T) {
 	}
 }
 
+func TestPullHandler_NameOverride(t *testing.T) {
+	// Source URL exposes a UD-flavored filename; we want the saved file
+	// (and the path emitted on the SSE 'downloaded' event) to use the
+	// caller-supplied name instead.
+	dlServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("fake gguf"))
+	}))
+	defer dlServer.Close()
+
+	dir := t.TempDir()
+	store := models.NewStore(dir)
+	h := &PullHandler{Store: store}
+
+	dlURL := dlServer.URL + "/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+	body := mustMarshal(t, map[string]string{
+		"url":  dlURL,
+		"name": "Qwen3.6-35B-A3B-Q4_K_M",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/pull", bytes.NewReader(body))
+	w := newFlushableRecorder()
+
+	h.ServeHTTP(w, req)
+
+	events := parseSSEEvents(t, w.Body.String())
+	if len(events) == 0 {
+		t.Fatal("expected SSE events")
+	}
+	last := events[len(events)-1]
+	if last["status"] != "downloaded" {
+		t.Fatalf("last event = %v, want downloaded", last)
+	}
+	gotPath, _ := last["path"].(string)
+	wantPath := dir + "/Qwen3.6-35B-A3B-Q4_K_M.gguf"
+	if gotPath != wantPath {
+		t.Errorf("downloaded path = %q, want %q", gotPath, wantPath)
+	}
+}
+
 func TestPullHandler_DownloadError(t *testing.T) {
 	// Server that returns an error
 	dlServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
