@@ -19,25 +19,31 @@ import (
 
 // withParallelEnabled re-enables parallel downloads (disabled in TestMain
 // via the shared init() to keep legacy tests stable) and lowers the size
-// threshold so tests can drive the parallel path with small fixtures.
+// threshold + per-chunk target so tests can drive the parallel path with
+// small fixtures.
 //
-// Restores the previous values on cleanup so concurrent tests aren't
-// affected. Returns nothing; the caller just calls it at the top of any
-// parallel-specific test.
-func withParallelEnabled(t *testing.T, minSize int64, concurrency int) {
+// chooseConcurrency() will pick `ceil(fileSize / chunkSize)` ranges,
+// capped at maxConcurrency — so calling withParallelEnabled(t, 1024, 4, 16)
+// with a 64 KB fixture yields 4 ranges of 16 KB each.
+//
+// Restores all package vars on cleanup so subsequent tests aren't affected.
+func withParallelEnabled(t *testing.T, minSize int64, chunkSize int64, maxConcurrency int) {
 	t.Helper()
 	prevDisabled := DisableParallelDownload
 	prevMin := ParallelDownloadMinSize
-	prevConc := ParallelDownloadConcurrency
+	prevChunk := ParallelDownloadMinChunkSize
+	prevMax := ParallelDownloadMaxConcurrency
 	prevBuf := ParallelDownloadChunkBuffer
 	DisableParallelDownload = false
 	ParallelDownloadMinSize = minSize
-	ParallelDownloadConcurrency = concurrency
+	ParallelDownloadMinChunkSize = chunkSize
+	ParallelDownloadMaxConcurrency = maxConcurrency
 	ParallelDownloadChunkBuffer = 4096 // small so tests exercise multiple read loops
 	t.Cleanup(func() {
 		DisableParallelDownload = prevDisabled
 		ParallelDownloadMinSize = prevMin
-		ParallelDownloadConcurrency = prevConc
+		ParallelDownloadMinChunkSize = prevChunk
+		ParallelDownloadMaxConcurrency = prevMax
 		ParallelDownloadChunkBuffer = prevBuf
 	})
 }
@@ -89,7 +95,8 @@ func makeBlob(n int) []byte {
 }
 
 func TestParallelDownload_HappyPath(t *testing.T) {
-	withParallelEnabled(t, 1024, 4) // threshold 1 KB so a small fixture triggers parallel
+	// 1 KB threshold, 16 KB chunks, max 4 ranges → 64 KB fixture yields 4 ranges
+	withParallelEnabled(t, 1024, 16*1024, 4)
 
 	content := makeBlob(64 * 1024)
 	var calls atomic.Int32
@@ -115,7 +122,7 @@ func TestParallelDownload_HappyPath(t *testing.T) {
 }
 
 func TestParallelDownload_FallsBackWhenNoRangeSupport(t *testing.T) {
-	withParallelEnabled(t, 1024, 4)
+	withParallelEnabled(t, 1024, 2*1024, 4)
 
 	content := makeBlob(8 * 1024)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +155,7 @@ func TestParallelDownload_SkipsSmallFiles(t *testing.T) {
 	// Threshold above the fixture size — parallel should be skipped and
 	// only the sequential path's single GET should fire (no HEAD probe in
 	// the result either, since we shortcut on size after probing).
-	withParallelEnabled(t, 1<<30, 4) // 1 GB threshold
+	withParallelEnabled(t, 1<<30, 1<<20, 4) // 1 GB threshold
 
 	content := makeBlob(8 * 1024)
 	var calls atomic.Int32
@@ -167,7 +174,7 @@ func TestParallelDownload_SkipsSmallFiles(t *testing.T) {
 }
 
 func TestParallelDownload_ProgressMonotonic(t *testing.T) {
-	withParallelEnabled(t, 1024, 4)
+	withParallelEnabled(t, 1024, 8*1024, 4)
 
 	content := makeBlob(32 * 1024)
 	srv := httptest.NewServer(rangeAwareHandler(content, nil))
@@ -204,7 +211,7 @@ func TestParallelDownload_ProgressMonotonic(t *testing.T) {
 }
 
 func TestParallelDownload_RetriesPerRangeOnTransientFailure(t *testing.T) {
-	withParallelEnabled(t, 1024, 2)
+	withParallelEnabled(t, 1024, 4*1024, 2)
 
 	content := makeBlob(8 * 1024)
 
@@ -268,7 +275,7 @@ func TestParallelDownload_RetriesPerRangeOnTransientFailure(t *testing.T) {
 }
 
 func TestParallelDownload_SaveAsOverrideStillApplies(t *testing.T) {
-	withParallelEnabled(t, 1024, 4)
+	withParallelEnabled(t, 1024, 2*1024, 4)
 
 	content := makeBlob(8 * 1024)
 	srv := httptest.NewServer(rangeAwareHandler(content, nil))
@@ -285,6 +292,40 @@ func TestParallelDownload_SaveAsOverrideStillApplies(t *testing.T) {
 	}
 	if _, err := os.Stat(want); err != nil {
 		t.Errorf("file not at expected location: %v", err)
+	}
+}
+
+func TestChooseConcurrency(t *testing.T) {
+	// Pin the tunables so this test isn't sensitive to package-level mutation
+	// from other tests running concurrently.
+	prevChunk := ParallelDownloadMinChunkSize
+	prevMax := ParallelDownloadMaxConcurrency
+	ParallelDownloadMinChunkSize = 128 * 1024 * 1024 // 128 MB
+	ParallelDownloadMaxConcurrency = 16
+	t.Cleanup(func() {
+		ParallelDownloadMinChunkSize = prevChunk
+		ParallelDownloadMaxConcurrency = prevMax
+	})
+
+	cases := []struct {
+		name string
+		size int64
+		want int
+	}{
+		{"100MB rounds up to 1 chunk", 100 * 1024 * 1024, 1},
+		{"128MB exactly is 1 chunk", 128 * 1024 * 1024, 1},
+		{"129MB rounds up to 2 chunks", 129 * 1024 * 1024, 2},
+		{"500MB → 4 chunks", 500 * 1024 * 1024, 4},
+		{"1GB → 8 chunks", 1024 * 1024 * 1024, 8},
+		{"2GB → 16 chunks (cap)", 2 * 1024 * 1024 * 1024, 16},
+		{"20GB → 16 chunks (cap)", 20 * 1024 * 1024 * 1024, 16},
+		{"1 byte → 1 chunk (floor)", 1, 1},
+	}
+	for _, c := range cases {
+		got := chooseConcurrency(c.size)
+		if got != c.want {
+			t.Errorf("%s: chooseConcurrency(%d) = %d, want %d", c.name, c.size, got, c.want)
+		}
 	}
 }
 

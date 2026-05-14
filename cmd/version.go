@@ -5,18 +5,15 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-)
 
-var (
-	Version   = "dev"
-	CommitSHA = "unknown"
+	"github.com/ThatCatDev/tanrenai-gpu/internal/buildinfo"
 )
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		_, _ = fmt.Fprintf(os.Stdout, "tanrenai-gpu %s (%s)\n", Version, CommitSHA)
+		_, _ = fmt.Fprintf(os.Stdout, "tanrenai-gpu %s\n", buildinfo.Version)
 	},
 }
 

@@ -45,7 +45,15 @@ FROM golang:1.25-bookworm AS go-build
 
 WORKDIR /src
 COPY . .
-RUN CGO_ENABLED=0 go build -o /tanrenai-gpu .
+# Derive the release identifier from the copied git metadata and stamp it
+# into the binary via ldflags. Falls back to "dev" for tarball builds that
+# strip the .git directory. Surfaced at runtime via /v1/version and the
+# `tanrenai-gpu version` subcommand so a deployed instance can tell you
+# exactly which commit it's running.
+RUN VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev) && \
+    CGO_ENABLED=0 go build \
+      -ldflags "-X github.com/ThatCatDev/tanrenai-gpu/internal/buildinfo.Version=$VERSION" \
+      -o /tanrenai-gpu .
 
 # ── Stage 3: Runtime image ─────────────────────────────────────────────
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04

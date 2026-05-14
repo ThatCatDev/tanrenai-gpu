@@ -26,13 +26,23 @@ var (
 	// roundtrip aren't worth it for small files.
 	ParallelDownloadMinSize int64 = 50 * 1024 * 1024
 
-	// ParallelDownloadConcurrency is how many concurrent range GETs we
-	// issue against a large file. 8 saturates most R2/CF edge paths without
-	// causing rate-limiting; higher values give diminishing returns.
-	ParallelDownloadConcurrency = 8
+	// ParallelDownloadMinChunkSize is the target bytes-per-range. The
+	// chosen N is `fileSize / MinChunkSize` (clamped by MaxConcurrency),
+	// so a 1 GB file gets 8 ranges of 128 MB each. Tuned so each chunk is
+	// big enough to amortize TCP slow-start (rule of thumb: BDP * 2-4) but
+	// not so big that one straggler dominates the tail.
+	ParallelDownloadMinChunkSize int64 = 128 * 1024 * 1024
+
+	// ParallelDownloadMaxConcurrency caps the chunk count regardless of
+	// file size. Past ~16 concurrent connections most object stores either
+	// rate-limit (R2 429s) or stop scaling (S3 caps per-IP). Files larger
+	// than MinChunkSize * MaxConcurrency just get bigger chunks instead of
+	// more chunks.
+	ParallelDownloadMaxConcurrency = 16
 
 	// ParallelDownloadChunkBuffer is the read buffer per in-flight range.
-	// Memory ceiling per download is roughly Concurrency * ChunkBuffer.
+	// Memory ceiling per download is roughly N * ChunkBuffer where N is
+	// the dynamically chosen concurrency.
 	ParallelDownloadChunkBuffer = 64 * 1024
 
 	// ParallelDownloadProbeTimeout caps the initial HEAD (+ optional GET
@@ -41,6 +51,27 @@ var (
 	// fall through to sequential.
 	ParallelDownloadProbeTimeout = 10 * time.Second
 )
+
+// chooseConcurrency picks the number of parallel ranges for a given file
+// size: at least one range per ParallelDownloadMinChunkSize bytes, capped
+// by ParallelDownloadMaxConcurrency. A 200 MB file gets 2 ranges; a 1 GB
+// file gets 8; anything past ~2 GB caps at MaxConcurrency.
+func chooseConcurrency(fileSize int64) int {
+	if ParallelDownloadMinChunkSize <= 0 {
+		return ParallelDownloadMaxConcurrency
+	}
+	n := int(fileSize / ParallelDownloadMinChunkSize)
+	if fileSize%ParallelDownloadMinChunkSize != 0 {
+		n++
+	}
+	if n < 1 {
+		n = 1
+	}
+	if n > ParallelDownloadMaxConcurrency {
+		n = ParallelDownloadMaxConcurrency
+	}
+	return n
+}
 
 // errNoRangeSupport signals that the server can't (or won't) honor Range
 // requests, so the caller should fall through to a single-stream download.
@@ -80,9 +111,10 @@ func tryParallel(partialPath, url string, progress DownloadProgress) bool {
 		return false
 	}
 
-	slog.Info("parallel download starting", "size", size, "concurrency", ParallelDownloadConcurrency)
+	concurrency := chooseConcurrency(size)
+	slog.Info("parallel download starting", "size", size, "concurrency", concurrency, "chunk_bytes", size/int64(concurrency))
 	start := time.Now()
-	err = parallelDownload(context.Background(), url, partialPath, size, ParallelDownloadConcurrency, progress)
+	err = parallelDownload(context.Background(), url, partialPath, size, concurrency, progress)
 	if err == nil {
 		slog.Info("parallel download finished", "size", size, "duration", time.Since(start).Round(time.Second))
 		return true
