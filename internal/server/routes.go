@@ -12,6 +12,7 @@ import (
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", handlers.Health)
+	mux.HandleFunc("GET /v1/version", handlers.Version)
 	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
 	mux.HandleFunc("POST /api/load", s.handleLoadModel)

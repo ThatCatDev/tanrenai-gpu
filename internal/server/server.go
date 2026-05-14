@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ThatCatDev/tanrenai-gpu/internal/buildinfo"
 	"github.com/ThatCatDev/tanrenai-gpu/internal/config"
 	"github.com/ThatCatDev/tanrenai-gpu/internal/gguf"
 	"github.com/ThatCatDev/tanrenai-gpu/internal/models"
@@ -57,7 +58,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 
-	slog.Info("Tanrenai GPU server listening", "addr", s.http.Addr)
+	slog.Info("Tanrenai GPU server listening", "addr", s.http.Addr, "version", buildinfo.Version)
 	slog.Info("directories configured", "models_dir", s.cfg.ModelsDir, "bin_dir", s.cfg.BinDir)
 
 	errCh := make(chan error, 1)
