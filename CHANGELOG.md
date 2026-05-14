@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.1.2...v1.2.0) (2026-05-14)
+
+### Features
+
+* **download:** parallel range GETs for large GGUF pulls ([#6](https://github.com/ThatCatDev/tanrenai-gpu/issues/6)) ([f2702b5](https://github.com/ThatCatDev/tanrenai-gpu/commit/f2702b58b47f2f4e420bcbfb5a3bc549598207a1))
+
 ## [1.1.2](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.1.1...v1.1.2) (2026-05-10)
 
 ### Bug Fixes
