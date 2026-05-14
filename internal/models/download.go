@@ -88,25 +88,36 @@ func Download(url, destDir, saveAs string, progress DownloadProgress) (string, e
 	destPath := filepath.Join(destDir, filename)
 	partialPath := destPath + ".partial"
 
-	var lastErr error
-	for attempt := 1; attempt <= DownloadMaxAttempts; attempt++ {
-		err := downloadAttempt(url, partialPath, progress)
-		if err == nil {
-			lastErr = nil
-			break
+	// Try parallel range download first when the file is large enough and
+	// the server supports byte ranges. R2 (and most object stores) cap
+	// per-connection throughput well below the bucket's total bandwidth,
+	// so 4-8 parallel ranges typically get 2-3x speedup on large pulls.
+	// We HEAD-probe first; if anything looks off we fall through to the
+	// existing sequential downloader (which handles resume + retry on a
+	// single stream and is what we used historically).
+	if tryParallel(partialPath, url, progress) {
+		// rename + metadata handled below
+	} else {
+		var lastErr error
+		for attempt := 1; attempt <= DownloadMaxAttempts; attempt++ {
+			err := downloadAttempt(url, partialPath, progress)
+			if err == nil {
+				lastErr = nil
+				break
+			}
+			lastErr = err
+			if !isRetryable(err) {
+				return "", err
+			}
+			if attempt >= DownloadMaxAttempts {
+				break
+			}
+			backoff := DownloadBackoffBase << uint(attempt-1)
+			time.Sleep(backoff)
 		}
-		lastErr = err
-		if !isRetryable(err) {
-			return "", err
+		if lastErr != nil {
+			return "", fmt.Errorf("download failed after %d attempts: %w", DownloadMaxAttempts, lastErr)
 		}
-		if attempt >= DownloadMaxAttempts {
-			break
-		}
-		backoff := DownloadBackoffBase << uint(attempt-1)
-		time.Sleep(backoff)
-	}
-	if lastErr != nil {
-		return "", fmt.Errorf("download failed after %d attempts: %w", DownloadMaxAttempts, lastErr)
 	}
 
 	if err := os.Rename(partialPath, destPath); err != nil {

@@ -22,6 +22,14 @@ func init() {
 	// 2 attempts so dial-fail tests (NetworkError) don't take 5× the OS
 	// connect timeout. Production still uses 5.
 	DownloadMaxAttempts = 2
+	// Match the stall threshold so misbehaving test servers can't block
+	// the probe HEAD any longer than the test's overall patience budget.
+	ParallelDownloadProbeTimeout = 500 * time.Millisecond
+	// Disable parallel range downloads in the legacy single-stream tests.
+	// They were written against the pre-parallel call pattern and assert on
+	// exact request counts. Tests specific to the parallel path opt in via
+	// their own setup.
+	DisableParallelDownload = true
 }
 
 func TestDownload_NonGGUFURL(t *testing.T) {
