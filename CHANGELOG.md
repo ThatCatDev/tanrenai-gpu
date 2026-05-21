@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.3.0...v1.4.0) (2026-05-21)
+
+### Features
+
+* **pull:** auto-derive on-disk basename from hf:// URI ([#8](https://github.com/ThatCatDev/tanrenai-gpu/issues/8)) ([dbeaf75](https://github.com/ThatCatDev/tanrenai-gpu/commit/dbeaf75709fb408c179dd0ddbf22b586489a2f2e))
+
 ## [1.3.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.2.0...v1.3.0) (2026-05-14)
 
 ### Features
