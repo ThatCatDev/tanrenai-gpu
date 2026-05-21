@@ -161,6 +161,67 @@ func TestPullHandler_NameOverride(t *testing.T) {
 	}
 }
 
+func TestDeriveSaveAs(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		reqName string
+		want    string
+	}{
+		// The motivating bug: pulling an hf:// URI whose repo carries a
+		// variant tag (MTP, etc.) must auto-derive the basename so the
+		// on-disk filename keeps that tag. Otherwise the actual .gguf in
+		// the HF repo (which omits the tag) becomes the on-disk identity
+		// and the user can't /api/load by the bare name they typed.
+		{
+			name:    "hf URI with MTP variant derives name",
+			url:     "hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF/Q8_0",
+			reqName: "",
+			want:    "Qwen3.6-35B-A3B-MTP-Q8_0",
+		},
+		{
+			name:    "hf URI with UD dynamic quant derives name",
+			url:     "hf://unsloth/Qwen3.5-122B-A10B-GGUF/UD-Q4_K_XL",
+			reqName: "",
+			want:    "Qwen3.5-122B-A10B-UD-Q4_K_XL",
+		},
+		{
+			name:    "explicit name wins over derivable URI",
+			url:     "hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF/Q8_0",
+			reqName: "caller-pinned-name",
+			want:    "caller-pinned-name",
+		},
+		{
+			name:    "explicit name with direct URL",
+			url:     "https://example.com/path/m.gguf",
+			reqName: "Qwen3.6-35B-A3B-Q4_K_M",
+			want:    "Qwen3.6-35B-A3B-Q4_K_M",
+		},
+		{
+			// Non-canonical hf:// (no -GGUF/<quant> shape) falls back to
+			// empty so models.Download keeps using the source filename.
+			name:    "hf URI without GGUF suffix returns empty",
+			url:     "hf://unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+			reqName: "",
+			want:    "",
+		},
+		{
+			name:    "direct download URL returns empty",
+			url:     "https://example.com/path/m.gguf",
+			reqName: "",
+			want:    "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := deriveSaveAs(tc.url, tc.reqName)
+			if got != tc.want {
+				t.Errorf("deriveSaveAs(%q, %q) = %q, want %q", tc.url, tc.reqName, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPullHandler_DownloadError(t *testing.T) {
 	// Server that returns an error
 	dlServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
