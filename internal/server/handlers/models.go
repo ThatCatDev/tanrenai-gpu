@@ -9,7 +9,21 @@ import (
 
 	"github.com/ThatCatDev/tanrenai-gpu/internal/models"
 	"github.com/ThatCatDev/tanrenai-gpu/pkg/api"
+	"github.com/ThatCatDev/tanrenai-gpu/pkg/naming"
 )
+
+// deriveSaveAs picks the destination basename to pass into models.Download.
+// An explicit caller-supplied name always wins. Otherwise, if the URL is a
+// canonical hf://<org>/<repo>-GGUF/<quant> pull URI, derive `<repo>-<quant>`
+// so the on-disk filename matches the bare name a caller would round-trip
+// through naming.ResolveBareNameToURI. Returns "" for anything else, which
+// preserves the legacy "use the source URL's filename" behavior.
+func deriveSaveAs(url, name string) string {
+	if name != "" {
+		return name
+	}
+	return naming.DeriveBareNameFromURI(url)
+}
 
 // ModelsHandler handles GET /v1/models.
 type ModelsHandler struct {
@@ -98,6 +112,14 @@ func (h *PullHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// regardless of the source URL's filename. Lets callers control the
 	// on-disk identity that /v1/models and /api/load see, so a user-typed
 	// model name flows through cache + pull + load unchanged.
+	//
+	// When `name` is empty and the URL is a canonical hf:// pull URI
+	// (`hf://<org>/<repo>-GGUF/<quant>`), we derive `<repo>-<quant>` and
+	// use that as the destination basename — the actual .gguf file in the
+	// HF repo often omits the repo-level variant tag (e.g. unsloth's
+	// `Qwen3.6-35B-A3B-MTP-GGUF` ships `Qwen3.6-35B-A3B-Q8_0.gguf` with no
+	// `MTP`), so without this step the on-disk name no longer matches what
+	// the caller would resolve from the repo URI.
 	var req struct {
 		URL  string `json:"url"`
 		Name string `json:"name"`
@@ -113,6 +135,8 @@ func (h *PullHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	saveAs := deriveSaveAs(req.URL, req.Name)
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -164,7 +188,7 @@ func (h *PullHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		path, err := models.Download(dlURL, h.Store.Dir(), req.Name, progress)
+		path, err := models.Download(dlURL, h.Store.Dir(), saveAs, progress)
 		if err != nil {
 			sendEvent(map[string]string{"status": "error", "error": err.Error()})
 
