@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.4.0...v1.4.1) (2026-05-24)
+
+### Bug Fixes
+
+* **server:** cap auto-detected context size at 32K ([#9](https://github.com/ThatCatDev/tanrenai-gpu/issues/9)) ([dd24e4b](https://github.com/ThatCatDev/tanrenai-gpu/commit/dd24e4bfe7f72db4ce35a9eca439ebc2aab5f99f))
+
 ## [1.4.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.3.0...v1.4.0) (2026-05-21)
 
 ### Features
