@@ -16,6 +16,13 @@ import (
 	"github.com/ThatCatDev/tanrenai-gpu/internal/training"
 )
 
+// maxAutoCtxSize caps the context length auto-detected from GGUF metadata.
+// Modern models (Qwen3.x, etc.) advertise 256K training contexts but the
+// KV cache for that is huge — for a 35B model at 256K it's ~64 GB, which
+// OOMs even on 80 GB cards. 32K is comfortable for chat workloads and lets
+// us pick smaller VRAM tiers; users with longer needs pass --ctx-size.
+const maxAutoCtxSize = 32768
+
 // Server is the tanrenai GPU server — pure inference + training API.
 type Server struct {
 	cfg             *config.Config
@@ -183,9 +190,19 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 	opts.OverrideTensor = s.cfg.OverrideTensor
 
 	// Auto-detect context length from GGUF when config uses the default.
+	// Cap at maxAutoCtxSize: Qwen3.x and similar models advertise 262144-token
+	// training contexts, but the resulting KV cache (tens of GB on a 35B) is
+	// what OOMs after weights load — and users virtually never need 256K of
+	// context in practice. Users who do can override --ctx-size explicitly.
 	if meta != nil && meta.Architecture.ContextLength > 0 && opts.CtxSize == runner.DefaultOptions().CtxSize {
 		opts.CtxSize = int(meta.Architecture.ContextLength)
-		slog.Info("auto-detected context length from GGUF", "ctx_size", opts.CtxSize)
+		if opts.CtxSize > maxAutoCtxSize {
+			slog.Info("clamping auto-detected context length",
+				"gguf_ctx_size", meta.Architecture.ContextLength, "ctx_size", maxAutoCtxSize)
+			opts.CtxSize = maxAutoCtxSize
+		} else {
+			slog.Info("auto-detected context length from GGUF", "ctx_size", opts.CtxSize)
+		}
 	}
 
 	// Log MoE architecture when detected. We don't auto-enable any
