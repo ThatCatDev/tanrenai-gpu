@@ -1,9 +1,9 @@
 # tanrenai-gpu
 
 GPU inference server: thin Go HTTP API wrapping llama.cpp's `llama-server`
-with CUDA support. Publishes as `thatcatdev/tanrenai-gpu:latest` on Docker
-Hub; runs on Vast.ai instances provisioned by `tanrenai-platform`, and
-embedded by the `tanrenai` CLI in `--local` mode.
+with CUDA support. Publishes as `harbor.floret.dev/tanrenai/tanrenai-gpu:latest`
+on the private Harbor registry; runs on Vast.ai instances provisioned by
+`tanrenai-platform`, and embedded by the `tanrenai` CLI in `--local` mode.
 
 ## Build
 
@@ -15,8 +15,9 @@ go test ./...
 ## Docker
 
 ```sh
+docker login harbor.floret.dev
 docker buildx build --platform linux/amd64 \
-  -t thatcatdev/tanrenai-gpu:latest \
+  -t harbor.floret.dev/tanrenai/tanrenai-gpu:latest \
   -f docker/Dockerfile --push .
 ```
 
