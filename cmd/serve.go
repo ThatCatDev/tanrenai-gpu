@@ -66,6 +66,10 @@ var serveCmd = &cobra.Command{
 			fa, _ := cmd.Flags().GetBool("flash-attn")
 			cfg.FlashAttention = fa
 		}
+		if cmd.Flags().Changed("context-shift") {
+			cs, _ := cmd.Flags().GetBool("context-shift")
+			cfg.ContextShift = cs
+		}
 		if cmd.Flags().Changed("no-auto-template") {
 			nat, _ := cmd.Flags().GetBool("no-auto-template")
 			cfg.NoAutoTemplate = nat
@@ -126,6 +130,7 @@ func init() {
 	serveCmd.Flags().String("embedding-model", "", "embedding model name (e.g. nomic-embed-text)")
 	serveCmd.Flags().String("reasoning-format", "", "reasoning format for thinking mode (e.g. deepseek)")
 	serveCmd.Flags().Bool("flash-attn", true, "enable flash attention")
+	serveCmd.Flags().Bool("context-shift", true, "discard oldest tokens when the context window fills (use --context-shift=false to disable)")
 	serveCmd.Flags().Bool("no-auto-template", false, "disable automatic chat template detection from GGUF metadata")
 	serveCmd.Flags().Bool("cpu-moe", false, "keep all MoE expert weights on CPU")
 	serveCmd.Flags().Int("n-cpu-moe", 0, "keep first N layers' MoE experts on CPU")
