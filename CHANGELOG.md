@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.4.1...v1.5.0) (2026-06-01)
+
+### Features
+
+* **server:** VRAM-aware context sizing + context shift by default ([#11](https://github.com/ThatCatDev/tanrenai-gpu/issues/11)) ([e918c2c](https://github.com/ThatCatDev/tanrenai-gpu/commit/e918c2cb375ce3e6ab142e1e6c2a01448df95687)), closes [#9](https://github.com/ThatCatDev/tanrenai-gpu/issues/9)
+
 ## [1.4.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.4.0...v1.4.1) (2026-05-24)
 
 ### Bug Fixes
