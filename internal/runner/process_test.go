@@ -161,6 +161,44 @@ func TestBuildArgs_NoFlashAttention(t *testing.T) {
 	}
 }
 
+func TestBuildArgs_ContextShift(t *testing.T) {
+	r := &ProcessRunner{
+		modelPath: "/models/mymodel.gguf",
+		opts: Options{
+			CtxSize:      4096,
+			ContextShift: true,
+		},
+	}
+
+	args := r.buildArgs()
+	found := false
+	for _, a := range args {
+		if a == "--context-shift" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("--context-shift should be in args when ContextShift=true")
+	}
+}
+
+func TestBuildArgs_NoContextShift(t *testing.T) {
+	r := &ProcessRunner{
+		modelPath: "/models/mymodel.gguf",
+		opts: Options{
+			CtxSize:      4096,
+			ContextShift: false,
+		},
+	}
+
+	args := r.buildArgs()
+	for _, a := range args {
+		if a == "--context-shift" {
+			t.Error("--context-shift should not be in args when ContextShift=false")
+		}
+	}
+}
+
 func TestBuildArgs_ChatTemplateFile(t *testing.T) {
 	r := &ProcessRunner{
 		modelPath: "/models/mymodel.gguf",

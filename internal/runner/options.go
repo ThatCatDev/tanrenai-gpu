@@ -23,6 +23,11 @@ type Options struct {
 	// FlashAttention enables flash attention if supported.
 	FlashAttention bool
 
+	// ContextShift enables llama-server's context shift: when the KV cache
+	// fills, the oldest tokens are discarded (keeping the initial prompt) so
+	// generation continues past the context window instead of erroring.
+	ContextShift bool
+
 	// ChatTemplateFile is an optional path to a Jinja chat template file.
 	// When set, llama-server uses this template instead of the GGUF-embedded one.
 	ChatTemplateFile string
@@ -75,5 +80,6 @@ func DefaultOptions() Options {
 		CtxSize:        4096,
 		Threads:        0,
 		FlashAttention: true,
+		ContextShift:   true,
 	}
 }

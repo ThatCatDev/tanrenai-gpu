@@ -29,6 +29,7 @@ type Config struct {
 	CPUMoE           bool   // keep all MoE expert weights on CPU
 	CPUMoELayers     int    // keep first N layers' MoE experts on CPU
 	NoKVOffload      bool   // keep KV cache on CPU to save VRAM
+	NoContextShift   bool   // disable context shift (on by default — oldest tokens dropped when the window fills)
 	FitVRAM          bool   // auto-adjust parameters to fit device memory
 	TensorSplit      string // per-GPU VRAM fractions
 	SplitMode        string // multi-GPU split strategy
@@ -67,6 +68,7 @@ func Start(ctx context.Context, cfg Config) error {
 	icfg.CPUMoE = cfg.CPUMoE
 	icfg.CPUMoELayers = cfg.CPUMoELayers
 	icfg.NoKVOffload = cfg.NoKVOffload
+	icfg.ContextShift = !cfg.NoContextShift
 	icfg.FitVRAM = cfg.FitVRAM
 	icfg.TensorSplit = cfg.TensorSplit
 	icfg.SplitMode = cfg.SplitMode

@@ -169,6 +169,10 @@ func (r *ProcessRunner) buildArgs() []string {
 		args = append(args, "--flash-attn", "on")
 	}
 
+	if r.opts.ContextShift {
+		args = append(args, "--context-shift")
+	}
+
 	args = append(args, "--jinja")
 
 	if r.opts.ChatTemplateFile != "" {
