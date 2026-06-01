@@ -16,13 +16,6 @@ import (
 	"github.com/ThatCatDev/tanrenai-gpu/internal/training"
 )
 
-// maxAutoCtxSize caps the context length auto-detected from GGUF metadata.
-// Modern models (Qwen3.x, etc.) advertise 256K training contexts but the
-// KV cache for that is huge — for a 35B model at 256K it's ~64 GB, which
-// OOMs even on 80 GB cards. 32K is comfortable for chat workloads and lets
-// us pick smaller VRAM tiers; users with longer needs pass --ctx-size.
-const maxAutoCtxSize = 32768
-
 // Server is the tanrenai GPU server — pure inference + training API.
 type Server struct {
 	cfg             *config.Config
@@ -180,6 +173,7 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 	opts.CtxSize = s.cfg.CtxSize
 	opts.ChatTemplateFile = s.cfg.ChatTemplateFile
 	opts.FlashAttention = s.cfg.FlashAttention
+	opts.ContextShift = s.cfg.ContextShift
 	opts.ReasoningFormat = s.cfg.ReasoningFormat
 	opts.CPUMoE = s.cfg.CPUMoE
 	opts.CPUMoELayers = s.cfg.CPUMoELayers
@@ -189,20 +183,14 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 	opts.SplitMode = s.cfg.SplitMode
 	opts.OverrideTensor = s.cfg.OverrideTensor
 
-	// Auto-detect context length from GGUF when config uses the default.
-	// Cap at maxAutoCtxSize: Qwen3.x and similar models advertise 262144-token
-	// training contexts, but the resulting KV cache (tens of GB on a 35B) is
-	// what OOMs after weights load — and users virtually never need 256K of
-	// context in practice. Users who do can override --ctx-size explicitly.
+	// Auto-detect context length from GGUF when the request leaves it at the
+	// default. Rather than blindly trusting the advertised training context
+	// (Qwen3.x et al. claim 256K, whose KV cache is tens of GB and OOMs after
+	// weights load), size it against free VRAM so big cards keep a large window
+	// while small ones stay safe. See autoDetectCtxSize for the budgeting and
+	// its fallbacks. Users can still override --ctx-size explicitly.
 	if meta != nil && meta.Architecture.ContextLength > 0 && opts.CtxSize == runner.DefaultOptions().CtxSize {
-		opts.CtxSize = int(meta.Architecture.ContextLength)
-		if opts.CtxSize > maxAutoCtxSize {
-			slog.Info("clamping auto-detected context length",
-				"gguf_ctx_size", meta.Architecture.ContextLength, "ctx_size", maxAutoCtxSize)
-			opts.CtxSize = maxAutoCtxSize
-		} else {
-			slog.Info("auto-detected context length from GGUF", "ctx_size", opts.CtxSize)
-		}
+		opts.CtxSize = autoDetectCtxSize(meta, modelPath, opts.NoKVOffload)
 	}
 
 	// Log MoE architecture when detected. We don't auto-enable any
