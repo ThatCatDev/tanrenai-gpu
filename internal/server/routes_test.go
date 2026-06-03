@@ -51,6 +51,48 @@ func TestServer_Routes_Load_ModelNotFound(t *testing.T) {
 	}
 }
 
+// TestServer_Routes_Status_NotLoaded returns 503 with loaded:false before any load.
+func TestServer_Routes_Status_NotLoaded(t *testing.T) {
+	s := New(newTestConfig(t))
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	w := httptest.NewRecorder()
+	s.http.Handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", w.Code)
+	}
+	var body map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &body)
+	if body["loaded"] != false {
+		t.Errorf("loaded = %v, want false", body["loaded"])
+	}
+}
+
+// TestServer_Routes_Status_Loaded reports model, ctx, parallel and per-user ctx.
+func TestServer_Routes_Status_Loaded(t *testing.T) {
+	s := New(newTestConfig(t))
+	s.loaded = &LoadResult{CtxSize: 131072, Parallel: 8, Model: "qwen3-32b"}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	w := httptest.NewRecorder()
+	s.http.Handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["loaded"] != true || body["model"] != "qwen3-32b" {
+		t.Errorf("unexpected body: %v", body)
+	}
+	if body["parallel"].(float64) != 8 || body["ctx_per_user"].(float64) != 16384 {
+		t.Errorf("parallel/ctx_per_user wrong: %v", body)
+	}
+}
+
 // TestServer_Routes_Pull_BadJSON exercises handlePullModel.
 func TestServer_Routes_Pull_BadJSON(t *testing.T) {
 	s := New(newTestConfig(t))

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ import (
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", handlers.Health)
 	mux.HandleFunc("GET /v1/version", handlers.Version)
+	mux.HandleFunc("GET /v1/status", s.handleStatus)
 	mux.HandleFunc("GET /v1/models", s.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", s.handleChatCompletions)
 	mux.HandleFunc("POST /api/load", s.handleLoadModel)
@@ -30,6 +32,37 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 		mux.HandleFunc("GET /v1/finetune/runs", ft.ListRuns)
 		mux.HandleFunc("DELETE /v1/finetune/runs/", ft.DeleteRun)
 	}
+}
+
+// handleStatus reports the currently loaded model and its serving capacity:
+// the total context window, the number of concurrent sequence slots
+// (--parallel, ≈ simultaneous users), and the resulting per-user context. The
+// platform uses `parallel` as the real capacity of a (potentially shared)
+// instance. Returns 503 until a model is loaded.
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	s.loadMu.Lock()
+	loaded := s.loaded
+	s.loadMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	if loaded == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]any{"loaded": false})
+
+		return
+	}
+
+	ctxPerUser := loaded.CtxSize
+	if loaded.Parallel > 1 {
+		ctxPerUser = loaded.CtxSize / loaded.Parallel
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"loaded":       true,
+		"model":        loaded.Model,
+		"ctx_size":     loaded.CtxSize,
+		"parallel":     loaded.Parallel,
+		"ctx_per_user": ctxPerUser,
+	})
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
