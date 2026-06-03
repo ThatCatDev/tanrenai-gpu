@@ -173,6 +173,10 @@ func (r *ProcessRunner) buildArgs() []string {
 		args = append(args, "--context-shift")
 	}
 
+	if r.opts.Parallel > 1 {
+		args = append(args, "--parallel", strconv.Itoa(r.opts.Parallel))
+	}
+
 	args = append(args, "--jinja")
 
 	if r.opts.ChatTemplateFile != "" {

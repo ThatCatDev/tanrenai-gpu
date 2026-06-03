@@ -13,6 +13,7 @@ type Config struct {
 	ReasoningFormat  string // optional reasoning format (e.g. "deepseek" for thinking/reasoning mode)
 	FlashAttention   bool   // enable flash attention (default true)
 	ContextShift     bool   // discard oldest tokens when KV cache fills (default true)
+	CtxPerUser       int    // per-user context window; >0 enables multi-slot auto-sizing (0 = single slot)
 	NoAutoTemplate   bool   // disable automatic template detection from GGUF metadata
 	CPUMoE           bool   // keep all MoE expert weights on CPU
 	CPUMoELayers     int    // keep first N layers' MoE experts on CPU (0 = disabled)
