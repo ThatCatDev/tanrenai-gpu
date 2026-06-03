@@ -295,3 +295,18 @@ func newFlushableTestRecorder() *flushableTestRecorder {
 }
 
 func (f *flushableTestRecorder) Flush() {}
+
+func TestEffectiveCtxPerUser(t *testing.T) {
+	cases := []struct {
+		ctx, parallel, want int
+	}{
+		{524288, 8, 65536}, // multi-slot: total split across slots
+		{200000, 1, 200000}, // single slot: full window
+		{4096, 0, 4096},     // parallel unset (0) treated as single slot
+	}
+	for _, c := range cases {
+		if got := effectiveCtxPerUser(c.ctx, c.parallel); got != c.want {
+			t.Errorf("effectiveCtxPerUser(%d,%d) = %d, want %d", c.ctx, c.parallel, got, c.want)
+		}
+	}
+}

@@ -77,8 +77,23 @@ func (s *Server) wrapLoadFunc() func(ctx context.Context, model string) (*handle
 			return nil, err
 		}
 
-		return &handlers.LoadResult{CtxSize: res.CtxSize}, nil
+		// Report the PER-USER window, not the total. With --parallel N the
+		// total ctx is split across N slots, so a single client/session only
+		// gets ctx_size/N. Clients budget their own context (and trigger
+		// compaction) off this number — handing them the total made them
+		// compact ~N× too late and overflow their slot.
+		return &handlers.LoadResult{CtxSize: effectiveCtxPerUser(res.CtxSize, res.Parallel)}, nil
 	}
+}
+
+// effectiveCtxPerUser is the context window a single session actually gets:
+// the total context divided across parallel slots.
+func effectiveCtxPerUser(ctxSize, parallel int) int {
+	if parallel > 1 {
+		return ctxSize / parallel
+	}
+
+	return ctxSize
 }
 
 func (s *Server) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
