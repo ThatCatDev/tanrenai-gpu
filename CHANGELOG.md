@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.6.0...v1.7.0) (2026-06-03)
+
+### Features
+
+* **server:** expose loaded model + slot capacity at /v1/status ([#13](https://github.com/ThatCatDev/tanrenai-gpu/issues/13)) ([de181ac](https://github.com/ThatCatDev/tanrenai-gpu/commit/de181ac5a209f59e51ef2c9f3259e1b27456c1b7))
+
 ## [1.6.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.5.0...v1.6.0) (2026-06-03)
 
 ### Features
