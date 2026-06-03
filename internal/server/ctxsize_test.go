@@ -80,3 +80,60 @@ func TestAutoDetectCtxSizeFallbacks(t *testing.T) {
 		t.Errorf("sparse-metadata ctx = %d, want static cap %d", got, maxAutoCtxSize)
 	}
 }
+
+// planContext with ctxPerUser == 0 must behave like single-slot auto-detect.
+func TestPlanContextSingleSlot(t *testing.T) {
+	meta := &gguf.Metadata{Architecture: gguf.Architecture{
+		ContextLength:   262144,
+		BlockCount:      32,
+		HeadCount:       32,
+		HeadCountKV:     8,
+		EmbeddingLength: 4096,
+	}}
+
+	plan := planContext(meta, "/nonexistent.gguf", false, 0)
+	if plan.Parallel != 1 {
+		t.Errorf("Parallel = %d, want 1", plan.Parallel)
+	}
+	if plan.CtxSize != autoDetectCtxSize(meta, "/nonexistent.gguf", false) {
+		t.Errorf("CtxSize = %d, want single-slot auto-detect value", plan.CtxSize)
+	}
+}
+
+// In multi-slot mode, when VRAM can't be measured (no nvidia-smi in CI) the
+// planner must fall back to a single slot rather than guessing a slot count.
+func TestPlanMultiSlotFallsBackWithoutVRAM(t *testing.T) {
+	meta := &gguf.Metadata{Architecture: gguf.Architecture{
+		ContextLength:   262144,
+		BlockCount:      32,
+		HeadCount:       32,
+		HeadCountKV:     8,
+		EmbeddingLength: 4096,
+	}}
+
+	// kvOnCPU short-circuits the VRAM path deterministically on any host.
+	plan := planContext(meta, "/nonexistent.gguf", true, 16384)
+	if plan.Parallel != 1 {
+		t.Errorf("Parallel = %d, want 1 (single-slot fallback)", plan.Parallel)
+	}
+}
+
+// A requested per-user context larger than the model's trained context must be
+// clamped down to it.
+func TestPlanMultiSlotClampsPerUserToTrainedContext(t *testing.T) {
+	meta := &gguf.Metadata{Architecture: gguf.Architecture{
+		ContextLength:   8192, // small trained context
+		BlockCount:      32,
+		HeadCount:       32,
+		HeadCountKV:     8,
+		EmbeddingLength: 4096,
+	}}
+
+	// kvOnCPU forces the single-slot fallback, whose CtxSize is the static cap
+	// (== trained context here, since 8192 < maxAutoCtxSize). The point is that
+	// asking for 131072 per user never yields a window beyond the trained 8192.
+	plan := planContext(meta, "/nonexistent.gguf", true, 131072)
+	if plan.CtxSize > 8192 {
+		t.Errorf("CtxSize = %d, want <= trained context 8192", plan.CtxSize)
+	}
+}

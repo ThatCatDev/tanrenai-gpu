@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ThatCatDev/tanrenai-gpu/internal/buildinfo"
@@ -21,6 +22,7 @@ type Server struct {
 	cfg             *config.Config
 	http            *http.Server
 	store           *models.Store
+	loadMu          sync.Mutex // serializes model loads so concurrent requests can't double-spawn
 	runner          runner.Runner
 	embeddingRunner *EmbeddingSubprocess
 	trainingManager *training.Manager
@@ -141,6 +143,11 @@ type LoadResult struct {
 
 // LoadModel loads a model by name into the runner.
 func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, error) {
+	// Serialize loads: concurrent chat requests for an unloaded (or different)
+	// model would otherwise each spawn a subprocess and clobber s.runner.
+	s.loadMu.Lock()
+	defer s.loadMu.Unlock()
+
 	modelPath, err := s.store.Resolve(modelName)
 	if err != nil {
 		return nil, err
@@ -190,7 +197,9 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 	// while small ones stay safe. See autoDetectCtxSize for the budgeting and
 	// its fallbacks. Users can still override --ctx-size explicitly.
 	if meta != nil && meta.Architecture.ContextLength > 0 && opts.CtxSize == runner.DefaultOptions().CtxSize {
-		opts.CtxSize = autoDetectCtxSize(meta, modelPath, opts.NoKVOffload)
+		plan := planContext(meta, modelPath, opts.NoKVOffload, s.cfg.CtxPerUser)
+		opts.CtxSize = plan.CtxSize
+		opts.Parallel = plan.Parallel
 	}
 
 	// Log MoE architecture when detected. We don't auto-enable any

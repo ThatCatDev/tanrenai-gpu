@@ -70,6 +70,9 @@ var serveCmd = &cobra.Command{
 			cs, _ := cmd.Flags().GetBool("context-shift")
 			cfg.ContextShift = cs
 		}
+		if n, _ := cmd.Flags().GetInt("ctx-per-user"); n > 0 {
+			cfg.CtxPerUser = n
+		}
 		if cmd.Flags().Changed("no-auto-template") {
 			nat, _ := cmd.Flags().GetBool("no-auto-template")
 			cfg.NoAutoTemplate = nat
@@ -131,6 +134,7 @@ func init() {
 	serveCmd.Flags().String("reasoning-format", "", "reasoning format for thinking mode (e.g. deepseek)")
 	serveCmd.Flags().Bool("flash-attn", true, "enable flash attention")
 	serveCmd.Flags().Bool("context-shift", true, "discard oldest tokens when the context window fills (use --context-shift=false to disable)")
+	serveCmd.Flags().Int("ctx-per-user", 0, "per-user context window; fits as many concurrent slots as VRAM allows (0 = single slot)")
 	serveCmd.Flags().Bool("no-auto-template", false, "disable automatic chat template detection from GGUF metadata")
 	serveCmd.Flags().Bool("cpu-moe", false, "keep all MoE expert weights on CPU")
 	serveCmd.Flags().Int("n-cpu-moe", 0, "keep first N layers' MoE experts on CPU")

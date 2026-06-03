@@ -199,6 +199,32 @@ func TestBuildArgs_NoContextShift(t *testing.T) {
 	}
 }
 
+func TestBuildArgs_Parallel(t *testing.T) {
+	r := &ProcessRunner{
+		modelPath: "/models/mymodel.gguf",
+		opts: Options{
+			CtxSize:  131072,
+			Parallel: 8,
+		},
+	}
+
+	mustContainPair(t, r.buildArgs(), "--parallel", "8")
+}
+
+func TestBuildArgs_NoParallelWhenSingleSlot(t *testing.T) {
+	for _, n := range []int{0, 1} {
+		r := &ProcessRunner{
+			modelPath: "/models/mymodel.gguf",
+			opts:      Options{CtxSize: 4096, Parallel: n},
+		}
+		for _, a := range r.buildArgs() {
+			if a == "--parallel" {
+				t.Errorf("--parallel should not be emitted for Parallel=%d", n)
+			}
+		}
+	}
+}
+
 func TestBuildArgs_ChatTemplateFile(t *testing.T) {
 	r := &ProcessRunner{
 		modelPath: "/models/mymodel.gguf",

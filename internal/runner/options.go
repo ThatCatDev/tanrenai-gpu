@@ -28,6 +28,11 @@ type Options struct {
 	// generation continues past the context window instead of erroring.
 	ContextShift bool
 
+	// Parallel is the number of concurrent sequence slots (llama-server's
+	// --parallel). CtxSize is the total context shared across these slots, so
+	// per-slot context = CtxSize / Parallel. 0 or 1 means a single slot.
+	Parallel int
+
 	// ChatTemplateFile is an optional path to a Jinja chat template file.
 	// When set, llama-server uses this template instead of the GGUF-embedded one.
 	ChatTemplateFile string
@@ -81,5 +86,6 @@ func DefaultOptions() Options {
 		Threads:        0,
 		FlashAttention: true,
 		ContextShift:   true,
+		Parallel:       1,
 	}
 }
