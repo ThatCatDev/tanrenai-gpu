@@ -1,3 +1,9 @@
+## [1.7.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.7.0...v1.7.1) (2026-06-03)
+
+### Bug Fixes
+
+* **server:** /api/load reports per-user context, not total ([#14](https://github.com/ThatCatDev/tanrenai-gpu/issues/14)) ([cce09f5](https://github.com/ThatCatDev/tanrenai-gpu/commit/cce09f5599f719f55623642fc3ff322e9b23fdd9))
+
 ## [1.7.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.6.0...v1.7.0) (2026-06-03)
 
 ### Features
