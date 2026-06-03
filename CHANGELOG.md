@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.5.0...v1.6.0) (2026-06-03)
+
+### Features
+
+* **server:** multi-user context slots (--ctx-per-user) ([#12](https://github.com/ThatCatDev/tanrenai-gpu/issues/12)) ([299da6e](https://github.com/ThatCatDev/tanrenai-gpu/commit/299da6ea05fa2658ac17c06e3f0e0867965ad00d))
+
 ## [1.5.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.4.1...v1.5.0) (2026-06-01)
 
 ### Features
