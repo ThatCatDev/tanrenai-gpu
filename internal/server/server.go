@@ -23,6 +23,7 @@ type Server struct {
 	http            *http.Server
 	store           *models.Store
 	loadMu          sync.Mutex // serializes model loads so concurrent requests can't double-spawn
+	loaded          *LoadResult // info about the currently loaded model (nil until first load)
 	runner          runner.Runner
 	embeddingRunner *EmbeddingSubprocess
 	trainingManager *training.Manager
@@ -138,7 +139,9 @@ func (s *Server) StartEmbeddingSubprocess(ctx context.Context, modelName string)
 
 // LoadResult contains information about a loaded model.
 type LoadResult struct {
-	CtxSize int
+	CtxSize  int
+	Parallel int    // concurrent sequence slots (≈ supported simultaneous users)
+	Model    string // name of the loaded model
 }
 
 // LoadModel loads a model by name into the runner.
@@ -246,5 +249,13 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 
 	s.runner = r
 
-	return &LoadResult{CtxSize: opts.CtxSize}, nil
+	// Default Parallel to a single slot when context auto-detection didn't run
+	// (e.g. explicit --ctx-size), so /v1/status always reports a sane capacity.
+	parallel := opts.Parallel
+	if parallel < 1 {
+		parallel = 1
+	}
+	s.loaded = &LoadResult{CtxSize: opts.CtxSize, Parallel: parallel, Model: modelName}
+
+	return s.loaded, nil
 }
