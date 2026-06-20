@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.7.1...v1.8.0) (2026-06-20)
+
+### Features
+
+* **chat:** surface mid-stream aborts instead of closing silently ([#15](https://github.com/ThatCatDev/tanrenai-gpu/issues/15)) ([4617a1f](https://github.com/ThatCatDev/tanrenai-gpu/commit/4617a1f78c49820560d3a1b6daf160e7b002fb2a))
+
 ## [1.7.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.7.0...v1.7.1) (2026-06-03)
 
 ### Bug Fixes
