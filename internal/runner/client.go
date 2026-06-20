@@ -136,9 +136,65 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req *api.ChatCompleti
 		return fmt.Errorf("llama-server returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	// Pipe the SSE stream directly to the response writer.
-	// llama-server already formats it as proper SSE (data: {...}\n\n).
-	_, err = io.Copy(w, resp.Body)
+	// Pipe the SSE stream to the response writer while tracking whether
+	// llama-server sent its terminal [DONE]. llama-server already formats proper
+	// SSE (data: {...}\n\n) and ends a healthy completion with `data: [DONE]`.
+	//
+	// A stream that ends WITHOUT [DONE] — even via a clean EOF (which io.Copy
+	// would report as success) — means llama-server aborted the generation
+	// mid-flight (slot/KV pressure, an internal error, a dropped connection).
+	// We surface that as an error, with the last bytes seen, so the handler can
+	// tell the caller instead of letting the stream go silently dead.
+	sawDone, tail, err := streamForwardingSSE(w, resp.Body)
+	if err != nil {
+		return fmt.Errorf("stream copy failed: %w (last_bytes=%q)", err, tail)
+	}
+	if !sawDone {
+		return fmt.Errorf("llama-server closed stream without [DONE] (last_bytes=%q)", tail)
+	}
 
-	return err
+	return nil
+}
+
+// sseDoneMarker is the terminator llama-server sends on a clean completion.
+var sseDoneMarker = []byte("[DONE]")
+
+// streamTailKeep bounds the rolling tail: enough to span a split [DONE] marker
+// across reads and to carry the last SSE event(s) for diagnostics.
+const streamTailKeep = 512
+
+// streamForwardingSSE copies src to dst, flushing each chunk so SSE events reach
+// the caller promptly, and reports whether the terminal [DONE] marker was seen
+// plus the trailing bytes of the stream (the last event(s) before it ended).
+// The rolling tail makes [DONE] detection robust to the marker being split
+// across read boundaries.
+func streamForwardingSSE(dst io.Writer, src io.Reader) (sawDone bool, tail []byte, err error) {
+	flusher, _ := dst.(http.Flusher)
+	buf := make([]byte, 4096)
+	for {
+		n, rerr := src.Read(buf)
+		if n > 0 {
+			combined := append(tail, buf[:n]...)
+			if len(combined) > streamTailKeep {
+				combined = combined[len(combined)-streamTailKeep:]
+			}
+			tail = make([]byte, len(combined))
+			copy(tail, combined)
+			if bytes.Contains(tail, sseDoneMarker) {
+				sawDone = true
+			}
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return sawDone, tail, werr
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				return sawDone, tail, nil
+			}
+			return sawDone, tail, rerr
+		}
+	}
 }
