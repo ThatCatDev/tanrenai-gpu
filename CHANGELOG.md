@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.8.0...v1.9.0) (2026-06-20)
+
+### Features
+
+* **runner:** capture llama-server crash reason and surface it to requests ([#16](https://github.com/ThatCatDev/tanrenai-gpu/issues/16)) ([ce66a38](https://github.com/ThatCatDev/tanrenai-gpu/commit/ce66a389c215b39a0bc3000c96e9add250e96486))
+
 ## [1.8.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.7.1...v1.8.0) (2026-06-20)
 
 ### Features
