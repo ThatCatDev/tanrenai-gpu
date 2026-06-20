@@ -34,7 +34,20 @@ type ProcessRunner struct {
 	restarts    int
 	crashNotify chan error // receives an error each time the process crashes
 	stopMonitor chan struct{}
+
+	// lastCrash records the most recent unexpected subprocess exit, so a request
+	// that hits the box while llama-server is down/restarting carries the reason
+	// it died (its stderr tail) instead of a bare "connection refused". Guarded
+	// by mu.
+	lastCrashCode int
+	lastCrashTail string
+	lastCrashAt   time.Time
 }
+
+// crashRecencyWindow bounds how long after a crash we still attribute a request
+// failure to it. Beyond this the box has had time to restart/reap, so an old
+// crash is unlikely to be the cause and we don't want to misattribute.
+const crashRecencyWindow = 2 * time.Minute
 
 // NewProcessRunner creates a new ProcessRunner.
 func NewProcessRunner() *ProcessRunner {
@@ -202,11 +215,18 @@ func (r *ProcessRunner) monitorCrashes() {
 			}
 
 			exitCode := r.sub.ExitCode()
-			slog.Error("llama-server process crashed", "exit_code", exitCode)
+			tail := r.sub.snapshotTail()
+			// stderr_tail carries llama-server's last output — the actual kill
+			// reason (e.g. "CUDA error: out of memory", a SIGILL/segfault). exit
+			// code alone ("-1") never says why.
+			slog.Error("llama-server process crashed", "exit_code", exitCode, "stderr_tail", tail)
 
 			r.mu.Lock()
 			r.restarts++
 			attempt := r.restarts
+			r.lastCrashCode = exitCode
+			r.lastCrashTail = tail
+			r.lastCrashAt = time.Now()
 			r.mu.Unlock()
 
 			crashErr := fmt.Errorf("llama-server crashed (exit code %d, restart %d/%d)", exitCode, attempt, maxRestartAttempts)
@@ -249,13 +269,41 @@ func (r *ProcessRunner) Health(ctx context.Context) error {
 func (r *ProcessRunner) ChatCompletion(ctx context.Context, req *api.ChatCompletionRequest) (*api.ChatCompletionResponse, error) {
 	req.Stream = false
 
-	return r.client.ChatCompletion(ctx, req)
+	resp, err := r.client.ChatCompletion(ctx, req)
+
+	return resp, r.annotateCrash(err)
 }
 
 func (r *ProcessRunner) ChatCompletionStream(ctx context.Context, req *api.ChatCompletionRequest, w io.Writer) error {
 	req.Stream = true
 
-	return r.client.ChatCompletionStream(ctx, req, w)
+	return r.annotateCrash(r.client.ChatCompletionStream(ctx, req, w))
+}
+
+// annotateCrash appends the most recent llama-server crash reason to a request
+// error when the crash was recent enough to plausibly be the cause. This turns
+// a bare "dial tcp ...: connection refused" into one that also says WHY the
+// subprocess was down (its stderr tail), so the reason flows downstream into
+// the platform's error log. Returns err unchanged when there's no recent crash.
+func (r *ProcessRunner) annotateCrash(err error) error {
+	if err == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.lastCrashAt.IsZero() || time.Since(r.lastCrashAt) > crashRecencyWindow {
+		return err
+	}
+	tail := r.lastCrashTail
+	if tail == "" {
+		tail = "(no stderr captured)"
+	}
+	// Cap the tail: the platform keeps only the last ~512 bytes of the stream,
+	// and the final stderr lines hold the actual error.
+	if len(tail) > 400 {
+		tail = "…" + tail[len(tail)-400:]
+	}
+	return fmt.Errorf("%w; last llama-server crash exit=%d: %s", err, r.lastCrashCode, tail)
 }
 
 func (r *ProcessRunner) Tokenize(ctx context.Context, text string) (int, error) {
