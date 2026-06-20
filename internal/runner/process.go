@@ -294,16 +294,50 @@ func (r *ProcessRunner) annotateCrash(err error) error {
 	if r.lastCrashAt.IsZero() || time.Since(r.lastCrashAt) > crashRecencyWindow {
 		return err
 	}
-	tail := r.lastCrashTail
+	reason := extractCrashReason(r.lastCrashTail)
+	if reason == "" {
+		reason = "(no stderr captured)"
+	}
+	if len(reason) > 400 {
+		reason = reason[:400] + "…"
+	}
+	return fmt.Errorf("%w; last llama-server crash exit=%d: %s", err, r.lastCrashCode, reason)
+}
+
+// backtraceFrame matches a C/C++ stack-trace line like
+// "/usr/local/lib/libfoo.so(_Zsym+0x12)[0x7f1a2b3c]" — pure stack noise that
+// crowds out the actual error message in a crash dump.
+var backtraceFrame = regexp.MustCompile(`\[0x[0-9a-fA-F]+\]\s*$`)
+
+// crashSignal flags lines that actually name a failure cause.
+var crashSignal = regexp.MustCompile(`(?i)(cuda error|out of memory|oom|ggml_assert|ggml[ _]|assert|terminate called|what\(\):|segmentation|sigsegv|sigabrt|abort|exception|error:|failed)`)
+
+// extractCrashReason pulls the meaningful reason out of a crash dump. llama.cpp
+// prints the cause (e.g. "CUDA error: out of memory", "GGML_ASSERT(...) failed")
+// BEFORE a long backtrace, so naively keeping the tail surfaces only libc stack
+// frames. We instead return the first line that names a cause and isn't a raw
+// backtrace frame; failing that, the first non-frame line (the dump header).
+func extractCrashReason(tail string) string {
 	if tail == "" {
-		tail = "(no stderr captured)"
+		return ""
 	}
-	// Cap the tail: the platform keeps only the last ~512 bytes of the stream,
-	// and the final stderr lines hold the actual error.
-	if len(tail) > 400 {
-		tail = "…" + tail[len(tail)-400:]
+	lines := strings.Split(tail, "\n")
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if t == "" || backtraceFrame.MatchString(t) {
+			continue
+		}
+		if crashSignal.MatchString(t) {
+			return t
+		}
 	}
-	return fmt.Errorf("%w; last llama-server crash exit=%d: %s", err, r.lastCrashCode, tail)
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if t != "" && !backtraceFrame.MatchString(t) {
+			return t
+		}
+	}
+	return strings.TrimSpace(tail)
 }
 
 func (r *ProcessRunner) Tokenize(ctx context.Context, text string) (int, error) {

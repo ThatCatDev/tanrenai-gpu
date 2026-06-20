@@ -34,7 +34,15 @@ const maxAutoParallel = 64
 // kvCacheReserveFraction holds back a slice of free VRAM for llama.cpp's
 // compute buffers, CUDA context, and fragmentation headroom — i.e. everything
 // that isn't model weights or the KV cache itself.
-const kvCacheReserveFraction = 0.10
+//
+// This is held back BEFORE the slot count is computed, so a bigger reserve =
+// fewer slots packed = more runtime headroom. 0.10 proved too thin: an A100
+// PCIE 80GB packed to 13 slots left only ~8GB for compute buffers, which scale
+// with the number of concurrent slots, and llama-server crash-looped under load
+// (CUDA abort in server_queue::start_loop). 0.20 roughly halves the slot count
+// on a large card and leaves real margin. Tune upward (toward 0.25) if OOM
+// crashes persist on a given deployment.
+const kvCacheReserveFraction = 0.20
 
 // ctxPlan is the chosen context configuration for a model load: the total
 // context window passed to llama-server (--ctx-size) and the number of

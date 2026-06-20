@@ -199,7 +199,10 @@ func NewSubprocess(cfg SubprocessConfig) (*Subprocess, error) {
 		baseURL:       fmt.Sprintf("http://127.0.0.1:%d", port),
 		healthTimeout: healthTimeout,
 		doneCh:        make(chan struct{}),
-		tailLimit:     50,
+		// 100 lines: a crash dump is the error line(s) followed by a C/C++
+		// backtrace that can run 30+ frames. Too small a window evicts the
+		// header (the actual reason) and leaves only stack frames.
+		tailLimit: 100,
 	}, nil
 }
 
