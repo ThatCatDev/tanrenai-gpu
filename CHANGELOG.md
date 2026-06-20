@@ -1,3 +1,9 @@
+## [1.9.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.9.0...v1.9.1) (2026-06-20)
+
+### Bug Fixes
+
+* **gpu:** stop OOM crash loops (VRAM reserve) + extract real crash reason ([#19](https://github.com/ThatCatDev/tanrenai-gpu/issues/19)) ([45654d1](https://github.com/ThatCatDev/tanrenai-gpu/commit/45654d19496036ab1c9e06ebeb62dfe2829e946a))
+
 ## [1.9.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.8.0...v1.9.0) (2026-06-20)
 
 ### Features
