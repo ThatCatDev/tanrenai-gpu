@@ -182,6 +182,13 @@ func (r *ProcessRunner) buildArgs() []string {
 		args = append(args, "--flash-attn", "on")
 	}
 
+	// Quantize the KV cache (both K and V) to shrink its VRAM footprint at large
+	// contexts — the dominant consumer for multi-slot serving. Requires flash
+	// attention (above). "f16"/"" leaves it at full precision.
+	if r.opts.KVCacheType != "" && r.opts.KVCacheType != "f16" {
+		args = append(args, "--cache-type-k", r.opts.KVCacheType, "--cache-type-v", r.opts.KVCacheType)
+	}
+
 	if r.opts.ContextShift {
 		args = append(args, "--context-shift")
 	}

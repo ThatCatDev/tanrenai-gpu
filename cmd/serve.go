@@ -66,6 +66,10 @@ var serveCmd = &cobra.Command{
 			fa, _ := cmd.Flags().GetBool("flash-attn")
 			cfg.FlashAttention = fa
 		}
+		if cmd.Flags().Changed("kv-cache-type") {
+			kct, _ := cmd.Flags().GetString("kv-cache-type")
+			cfg.KVCacheType = kct
+		}
 		if cmd.Flags().Changed("context-shift") {
 			cs, _ := cmd.Flags().GetBool("context-shift")
 			cfg.ContextShift = cs
@@ -133,6 +137,7 @@ func init() {
 	serveCmd.Flags().String("embedding-model", "", "embedding model name (e.g. nomic-embed-text)")
 	serveCmd.Flags().String("reasoning-format", "", "reasoning format for thinking mode (e.g. deepseek)")
 	serveCmd.Flags().Bool("flash-attn", true, "enable flash attention")
+	serveCmd.Flags().String("kv-cache-type", "q8_0", "KV cache quantization for K and V (e.g. q8_0); f16 = full precision")
 	serveCmd.Flags().Bool("context-shift", true, "discard oldest tokens when the context window fills (use --context-shift=false to disable)")
 	serveCmd.Flags().Int("ctx-per-user", 0, "per-user context window; fits as many concurrent slots as VRAM allows (0 = single slot)")
 	serveCmd.Flags().Bool("no-auto-template", false, "disable automatic chat template detection from GGUF metadata")

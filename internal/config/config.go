@@ -12,6 +12,7 @@ type Config struct {
 	EmbeddingModel   string // optional embedding model name/path
 	ReasoningFormat  string // optional reasoning format (e.g. "deepseek" for thinking/reasoning mode)
 	FlashAttention   bool   // enable flash attention (default true)
+	KVCacheType      string // KV cache quantization for K and V, e.g. "q8_0" (default); "f16" = full precision
 	ContextShift     bool   // discard oldest tokens when KV cache fills (default true)
 	CtxPerUser       int    // per-user context window; >0 enables multi-slot auto-sizing (0 = single slot)
 	NoAutoTemplate   bool   // disable automatic template detection from GGUF metadata
@@ -34,6 +35,7 @@ func DefaultConfig() *Config {
 		GPULayers:      -1, // auto
 		CtxSize:        4096,
 		FlashAttention: true,
+		KVCacheType:    "q8_0",
 		ContextShift:   true,
 	}
 }

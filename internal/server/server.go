@@ -22,7 +22,7 @@ type Server struct {
 	cfg             *config.Config
 	http            *http.Server
 	store           *models.Store
-	loadMu          sync.Mutex // serializes model loads so concurrent requests can't double-spawn
+	loadMu          sync.Mutex  // serializes model loads so concurrent requests can't double-spawn
 	loaded          *LoadResult // info about the currently loaded model (nil until first load)
 	runner          runner.Runner
 	embeddingRunner *EmbeddingSubprocess
@@ -183,6 +183,7 @@ func (s *Server) LoadModel(ctx context.Context, modelName string) (*LoadResult, 
 	opts.CtxSize = s.cfg.CtxSize
 	opts.ChatTemplateFile = s.cfg.ChatTemplateFile
 	opts.FlashAttention = s.cfg.FlashAttention
+	opts.KVCacheType = s.cfg.KVCacheType
 	opts.ContextShift = s.cfg.ContextShift
 	opts.ReasoningFormat = s.cfg.ReasoningFormat
 	opts.CPUMoE = s.cfg.CPUMoE
