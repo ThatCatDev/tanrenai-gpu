@@ -23,6 +23,13 @@ type Options struct {
 	// FlashAttention enables flash attention if supported.
 	FlashAttention bool
 
+	// KVCacheType sets the KV cache quantization for both K and V
+	// (llama-server's --cache-type-k/--cache-type-v), e.g. "q8_0". Empty or
+	// "f16" leaves the cache at full f16 precision. q8_0 roughly halves the
+	// KV-cache VRAM at large contexts (near-lossless for chat/tools) and
+	// requires flash attention, which is on by default.
+	KVCacheType string
+
 	// ContextShift enables llama-server's context shift: when the KV cache
 	// fills, the oldest tokens are discarded (keeping the initial prompt) so
 	// generation continues past the context window instead of erroring.
@@ -87,5 +94,6 @@ func DefaultOptions() Options {
 		FlashAttention: true,
 		ContextShift:   true,
 		Parallel:       1,
+		KVCacheType:    "q8_0",
 	}
 }
