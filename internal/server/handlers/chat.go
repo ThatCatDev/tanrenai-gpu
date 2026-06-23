@@ -32,6 +32,13 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Repair any malformed tool-call arguments in the history before they reach
+	// llama-server's strict parser — a truncated tool call replayed by the
+	// client must not 500 the whole turn. See sanitizeToolCallArguments.
+	if n := sanitizeToolCallArguments(&req); n > 0 {
+		slog.Warn("sanitized malformed tool-call arguments in request", "count", n, "model", req.Model)
+	}
+
 	// Auto-load the model if not already loaded or if a different model is requested
 	currentRunner := h.GetRunner()
 	if currentRunner == nil || (req.Model != "" && normalizeModelName(currentRunner.ModelName()) != normalizeModelName(req.Model)) {
