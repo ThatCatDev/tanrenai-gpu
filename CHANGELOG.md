@@ -1,3 +1,9 @@
+## [1.9.2](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.9.1...v1.9.2) (2026-06-23)
+
+### Bug Fixes
+
+* **chat:** sanitize malformed tool-call arguments + log llama-server 500s ([#20](https://github.com/ThatCatDev/tanrenai-gpu/issues/20)) ([4d0a643](https://github.com/ThatCatDev/tanrenai-gpu/commit/4d0a643e1c323e5dd7e5275feb7b67518a30b721))
+
 ## [1.9.1](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.9.0...v1.9.1) (2026-06-20)
 
 ### Bug Fixes
