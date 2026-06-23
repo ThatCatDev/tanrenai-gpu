@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -60,6 +61,7 @@ func (c *Client) ChatCompletion(ctx context.Context, req *api.ChatCompletionRequ
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
+		slog.Error("llama-server returned non-200 (chat)", "status", resp.StatusCode, "body", string(respBody))
 
 		return nil, fmt.Errorf("llama-server returned %d: %s", resp.StatusCode, string(respBody))
 	}
@@ -132,6 +134,7 @@ func (c *Client) ChatCompletionStream(ctx context.Context, req *api.ChatCompleti
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
+		slog.Error("llama-server returned non-200 (chat stream)", "status", resp.StatusCode, "body", string(respBody))
 
 		return fmt.Errorf("llama-server returned %d: %s", resp.StatusCode, string(respBody))
 	}
