@@ -1,3 +1,9 @@
+## [1.10.0](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.9.2...v1.10.0) (2026-06-23)
+
+### Features
+
+* **runner:** quantize KV cache to q8_0 to cut VRAM at large contexts ([#21](https://github.com/ThatCatDev/tanrenai-gpu/issues/21)) ([17597dd](https://github.com/ThatCatDev/tanrenai-gpu/commit/17597dd46fa7e9b123284f91e7615edcafc7a016))
+
 ## [1.9.2](https://github.com/ThatCatDev/tanrenai-gpu/compare/v1.9.1...v1.9.2) (2026-06-23)
 
 ### Bug Fixes
